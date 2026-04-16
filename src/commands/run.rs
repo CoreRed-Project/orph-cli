@@ -65,9 +65,12 @@ fn validate_script_name(name: &str) -> Result<()> {
     Ok(())
 }
 
+/// (timeout_secs, json_override, quiet_override, verbose_override, cleaned_args)
+type RunFlags = (Option<u64>, bool, bool, bool, Vec<String>);
+
 /// Extract --timeout, --json, --quiet, --verbose from args vec.
 /// Returns (timeout, json_override, quiet_override, verbose_override, cleaned_args).
-fn extract_run_flags(parts: &[String]) -> Result<(Option<u64>, bool, bool, bool, Vec<String>)> {
+fn extract_run_flags(parts: &[String]) -> Result<RunFlags> {
     let mut timeout = None;
     let mut json = false;
     let mut quiet = false;

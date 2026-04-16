@@ -103,20 +103,12 @@ fn status(sys: &System, flags: &OutputFlags) {
     };
     let mem_used = sys.used_memory();
     let mem_total = sys.total_memory();
-    let mem_pct = if mem_total > 0 {
-        mem_used * 100 / mem_total
-    } else {
-        0
-    };
+    let mem_pct = (mem_used * 100).checked_div(mem_total).unwrap_or(0);
 
     // Disk: aggregate all physical disks, pick root mount or sum all.
     let disks = Disks::new_with_refreshed_list();
     let (disk_total, disk_used) = disk_stats(&disks);
-    let disk_pct = if disk_total > 0 {
-        disk_used * 100 / disk_total
-    } else {
-        0
-    };
+    let disk_pct = (disk_used * 100).checked_div(disk_total).unwrap_or(0);
 
     if flags.json {
         println!(

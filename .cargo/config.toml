@@ -5,8 +5,3 @@
 #   brew install messense/macos-cross-toolchains/aarch64-unknown-linux-gnu
 #
 # On Linux/CI, install: gcc-aarch64-linux-gnu
-
-[target.aarch64-unknown-linux-gnu]
-# Uncomment and adjust for your system:
-# linker = "aarch64-linux-gnu-gcc"
-# linker = "aarch64-unknown-linux-gnu-gcc"
