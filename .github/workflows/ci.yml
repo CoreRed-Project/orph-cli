@@ -67,13 +67,7 @@ jobs:
             target
           key: ${{ runner.os }}-arm64-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Configure cross-compilation linker
-        run: |
-          mkdir -p .cargo
-          cat >> .cargo/config.toml << 'EOF'
-          [target.aarch64-unknown-linux-gnu]
-          linker = "aarch64-linux-gnu-gcc"
-          EOF
-
       - name: Cross-build ARM64
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: cargo build --release --target aarch64-unknown-linux-gnu
