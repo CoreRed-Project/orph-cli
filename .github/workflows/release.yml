@@ -1,0 +1,165 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux-x86:
+    name: Build Linux x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-x86-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Package binaries
+        run: |
+          mkdir -p dist
+          cp target/release/orph  dist/orph-linux-x86_64
+          cp target/release/orphd dist/orphd-linux-x86_64
+          chmod +x dist/orph-linux-x86_64 dist/orphd-linux-x86_64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: dist/
+
+  build-linux-arm64:
+    name: Build Linux ARM64 (Raspberry Pi)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable + ARM64 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Install ARM64 linker
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-arm64-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Configure cross-compilation linker
+        run: |
+          mkdir -p .cargo
+          cat >> .cargo/config.toml << 'EOF'
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          EOF
+
+      - name: Cross-build ARM64 release
+        run: cargo build --release --target aarch64-unknown-linux-gnu
+
+      - name: Package binaries
+        run: |
+          mkdir -p dist
+          cp target/aarch64-unknown-linux-gnu/release/orph  dist/orph-linux-aarch64
+          cp target/aarch64-unknown-linux-gnu/release/orphd dist/orphd-linux-aarch64
+          chmod +x dist/orph-linux-aarch64 dist/orphd-linux-aarch64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-aarch64
+          path: dist/
+
+  build-macos:
+    name: Build macOS (Apple Silicon + Intel)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-macos-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Package binaries
+        run: |
+          mkdir -p dist
+          cp target/release/orph  dist/orph-macos
+          cp target/release/orphd dist/orphd-macos
+          chmod +x dist/orph-macos dist/orphd-macos
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/
+
+  release:
+    name: Create GitHub Release
+    needs: [build-linux-x86, build-linux-arm64, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            **Linux x86_64:**
+            ```bash
+            curl -L https://github.com/CoreRed-Project/orph-cli/releases/download/${{ github.ref_name }}/orph-linux-x86_64 -o orph
+            curl -L https://github.com/CoreRed-Project/orph-cli/releases/download/${{ github.ref_name }}/orphd-linux-x86_64 -o orphd
+            chmod +x orph orphd && sudo mv orph orphd /usr/local/bin/
+            ```
+
+            **Raspberry Pi (ARM64):**
+            ```bash
+            curl -L https://github.com/CoreRed-Project/orph-cli/releases/download/${{ github.ref_name }}/orph-linux-aarch64 -o orph
+            curl -L https://github.com/CoreRed-Project/orph-cli/releases/download/${{ github.ref_name }}/orphd-linux-aarch64 -o orphd
+            chmod +x orph orphd && sudo mv orph orphd /usr/local/bin/
+            ```
+

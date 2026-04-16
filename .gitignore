@@ -1,0 +1,7 @@
+/target
+.idea/
+*.swp
+*.swo
+.DS_Store
+orph.db
+orph.log
