@@ -7,8 +7,8 @@
 [![CI](https://github.com/CoreRed-Project/orph-cli/workflows/CI/badge.svg)](https://github.com/CoreRed-Project/orph-cli/actions)
 
 <p align="center">
-  <strong>Lightweight ✦ Ergonomic ✦ Offline-first</strong><br>
-  <em>A cyberdeck-oriented CLI companion for your local machine.</em>
+  <strong>Offline-first ✦ Zero dependencies ✦ Built for constrained hardware</strong><br>
+  <em>On-device Raspberry Pi Harness. One binary. No network. No noise.</em>
 </p>
 
 <p align="center">
@@ -23,27 +23,31 @@
 
 ## About
 
-**Orph** is a lightweight, offline-first CLI tool for local system management, script execution, and personal workflow automation — built for cyberdeck-oriented setups.
+**Orph** is a local harness for Raspberry Pi and other offline, resource-constrained devices. It standardizes your on-device workflows — script execution, config management, system inspection — without requiring a network, a package manager, or anything beyond the binary itself.
 
-It ships as two binaries: `orph` (the CLI) and `orphd` (an optional background daemon). The CLI works standalone; the daemon adds persistent state management over a Unix socket. No network calls. No cloud. Everything lives in `~/.orph/`.
+Fresh Pi. No network. No packages. You need to inspect the system, run scripts, persist state — without installing anything first. That's where Orph lives. Drop the binary, run it. Zero runtime dependencies means an entire class of problems just doesn't exist.
+
+It ships as two binaries: `orph` (the CLI) and `orphd` (an optional background daemon). Everything lives in `~/.orph/`. No external calls. No cloud. No surprises.
+
+Orph isn't competing with modern CLI toolkits. It's competing with the friction that comes with running headless, offline, or on hardware where things break quietly and nothing is guaranteed.
 
 ### Philosophy
 
 > *"Local-first. No external services. No dependencies beyond the binary."*
 
-Orph is built for people who want their tools fast, predictable, and entirely under their control. The daemon is optional — if it's not running, the CLI falls back to local execution transparently. No noise.
+The typical Pi setup is full of implicit assumptions: network available, packages installed, paths correct. Orph removes as many of those assumptions as possible. The daemon is optional — if it's not running, the CLI falls back silently to local execution. If a script fails, you know why. If telemetry runs, it stays on-device.
 
 This is a **Core Red** project, part of the Sxnnyside Project's experimental branch.
 
 ## Features
 
-- **System monitoring**: CPU, memory, disk usage and host info via `orph sys`
-- **Script runner**: Execute scripts from `~/.orph/scripts/` with timeout, captured output, and path safety
-- **Virtual pet** ฅ^•ﻌ•^ฅ: A time-decaying companion that lives in your terminal — `orph pet`
-- **Config store**: SQLite-backed key/value config via `orph cfg`
-- **Local telemetry**: Command usage tracking, stored locally, never transmitted
-- **Shell completions**: Bash, Zsh, Fish via `orph completions`
-- **Optional daemon (`orphd`)**: Background Unix socket server for persistent state; CLI falls back gracefully if offline
+- **Consistent script runner**: Standardize workflows across environments from `~/.orph/scripts/` — with timeout, captured output, and path safety. Same interface whether you're SSHed in, running headless, or on a fresh flash.
+- **Local config store**: SQLite-backed key/value store via `orph cfg`. Persistent, inspectable, no daemon required.
+- **Optional daemon (`orphd`)**: Unix socket server for persistent state across rapid invocations. CLI works fully without it, falls back gracefully.
+- **System inspection**: Quick CPU, memory, disk, and host info via `orph sys` — useful when you don't have a dashboard or htop handy.
+- **Shell completions**: Bash, Zsh, Fish via `orph completions`.
+- **Local telemetry**: Command usage tracking stored in `~/.orph/orph.db`. Never transmitted. Opt-out in one command.
+- **Virtual pet** ฅ^•ﻌ•^ฅ: A time-decaying companion that lives in your terminal — `orph pet`. It fits the vibe, stays out of your way.
 
 ## Installation
 
@@ -66,34 +70,32 @@ Both `orph` and `orphd` need to be on `$PATH` for `orph core start` to work. `ma
 
 ### Cross-compilation (Raspberry Pi 5)
 
+This is the primary target. Cross-compile on your dev machine, copy the binaries over, done.
+
 ```bash
 make cross
 # copy target/aarch64-unknown-linux-gnu/release/{orph,orphd} to your Pi
 ```
 
+No runtime dependencies on the Pi side. Drop the binary, run it.
+
 ## Usage
 
 ```bash
-# system
+# system inspection
 orph sys status
 orph sys info
 
-# scripts — stored in ~/.orph/scripts/
-# first run of `orph run list` creates the directory and a sample script
+# script runner — scripts live in ~/.orph/scripts/
+# first `orph run list` creates the directory and drops a sample script
 orph run list
 orph run my-script --timeout 30
 
-# add your own script:
+# add your own:
 #   echo '#!/bin/sh' > ~/.orph/scripts/hello
 #   echo 'echo "hello!"' >> ~/.orph/scripts/hello
 #   chmod +x ~/.orph/scripts/hello
 #   orph run hello
-
-# pet (no subcommand defaults to status)
-orph pet
-orph pet feed
-orph pet play
-orph pet rename HAL
 
 # config
 orph cfg list
@@ -111,9 +113,15 @@ orph core start             # start orphd in background
 orph core status            # check if running
 orph core stop
 
-# telemetry
+# telemetry (local only)
 orph telemetry
 orph telemetry top
+
+# pet (no subcommand defaults to status)
+orph pet
+orph pet feed
+orph pet play
+orph pet rename HAL
 
 # shell completions (add to your shell profile)
 orph completions zsh >> ~/.zshrc
@@ -123,21 +131,16 @@ Global flags: `--json` ✦ `--quiet` ✦ `--verbose`
 
 ### Daemon (`orphd`)
 
-`orphd` is an **optional** background daemon. The CLI works fully without it, falling back to local SQLite for all state. Starting the daemon enables persistent state across invocations and is useful if you run multiple `orph` commands in quick succession.
+`orphd` is optional. The CLI works fully without it — all state falls back to local SQLite. The daemon is useful if you're running many `orph` commands in quick succession and want persistent state across invocations.
 
-Both `orph` and `orphd` must be in the same directory (or both on `$PATH`) for `orph core start` to work. `make install` handles this automatically.
-
-When the daemon is offline, commands that support it will note `[daemon offline — running in local fallback mode]`.
+When offline, commands that support the daemon will note `[daemon offline — running in local fallback mode]`. Nothing breaks silently.
 
 ### Telemetry
 
-Orph logs command usage locally to `~/.orph/orph.db`. Nothing is sent externally.
-
-To opt out:
+Command usage is logged locally to `~/.orph/orph.db`. Nothing leaves the device.
 
 ```bash
 orph cfg set telemetry disabled
-# confirmation: set telemetry = disabled
 
 # verify:
 orph telemetry
@@ -160,4 +163,3 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
   <strong>Orph</strong> — A Core Red Project<br>
   <em>&copy; 2026 Sxnnyside Project</em>
 </p>
-

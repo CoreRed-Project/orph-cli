@@ -10,6 +10,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ---
 
+## [v0.1.1] — 2026-04-16
+
+### Changed
+
+- **Scope redefinition:** `orph` is now explicitly scoped as a *local-first cyberdeck CLI tooling system*; daemon (`orphd`) is positioned as an optional state accelerator, not a required component
+- **UX — output clarity:** human-readable output reviewed across all commands; labels, spacing, and wording made consistent
+- **UX — daemon offline banner:** `[daemon offline — running in local fallback mode]` message is now printed only once per invocation (removed duplicate lines in `sys` + `pet` combined flows)
+- **UX — error messages:** actionable error hints added for `orph core start` (binary not found), `orph run` (script not found / bad name), and `orph cfg set` (missing value)
+
+### Fixed
+
+- ARM64 cross-compilation linker configuration in CI: linker now declared statically in `.cargo/config.toml` instead of being appended dynamically, preventing duplicate-key errors
+- Clippy warnings resolved: `checked_div()` used for `mem_pct` and `disk_pct`; `RunFlags` type alias introduced to reduce type complexity
+
+---
+
 ## [v0.1.0] — 2026-04-16
 
 ### Added
@@ -57,5 +73,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ---
 
-[Unreleased]: https://github.com/CoreRed-Project/orph-cli/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/CoreRed-Project/orph-cli/compare/v0.1.1...HEAD
+[v0.1.1]: https://github.com/CoreRed-Project/orph-cli/compare/v0.1.0...v0.1.1
 [v0.1.0]: https://github.com/CoreRed-Project/orph-cli/releases/tag/v0.1.0
