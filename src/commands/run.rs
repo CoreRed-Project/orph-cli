@@ -1,7 +1,9 @@
 use crate::cli::OutputFlags;
-use crate::services::logger;
+use crate::ipc;
+use crate::services::{cron_service, logger, paths, script_runner};
 use anyhow::{Result, anyhow, bail};
 use clap::{Args, Subcommand};
+use rusqlite::Connection;
 use serde::Serialize;
 use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
@@ -25,6 +27,7 @@ impl RunArgs {
     pub fn subcommand_name(&self) -> &'static str {
         match &self.cmd {
             RunCmd::List => "list",
+            RunCmd::Cron { .. } => "cron",
             RunCmd::Script { .. } => "script",
         }
     }
@@ -34,9 +37,28 @@ impl RunArgs {
 pub enum RunCmd {
     /// List available scripts in ~/.orph/scripts/
     List,
+    /// Schedule scripts via orphd (cron-like, local only)
+    Cron {
+        #[command(subcommand)]
+        action: CronAction,
+    },
     /// Run a script by name: `orph run <script-name> [args...] [--timeout <secs>]`
     #[command(external_subcommand)]
     Script(Vec<String>),
+}
+
+#[derive(Subcommand)]
+pub enum CronAction {
+    /// Register `orph run --cron <script>` — runs every N seconds when orphd is active
+    Add {
+        script: String,
+        #[arg(long, value_name = "SECS", default_value = "3600")]
+        every: u64,
+    },
+    /// List scheduled scripts
+    List,
+    /// Remove a scheduled script
+    Remove { script: String },
 }
 
 #[derive(Serialize)]
@@ -50,8 +72,7 @@ struct ScriptResult {
 }
 
 fn scripts_dir() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    PathBuf::from(home).join(".orph").join("scripts")
+    paths::scripts_dir()
 }
 
 /// Safety: reject names with path separators to prevent directory traversal.
@@ -98,11 +119,73 @@ fn extract_run_flags(parts: &[String]) -> Result<RunFlags> {
     Ok((timeout, json, quiet, verbose, rest))
 }
 
-pub fn handle(args: RunArgs, flags: &OutputFlags) -> Result<()> {
+pub fn handle(args: RunArgs, flags: &OutputFlags, db: &Connection) -> Result<()> {
     match args.cmd {
         RunCmd::List => list_scripts(flags),
+        RunCmd::Cron { action } => handle_cron(action, flags, db),
         RunCmd::Script(parts) => run_script(&parts, flags),
     }
+}
+
+fn handle_cron(action: CronAction, flags: &OutputFlags, db: &Connection) -> Result<()> {
+    match action {
+        CronAction::Add { script, every } => {
+            script_runner::validate_script_name(&script)?;
+            if !script_runner::script_path(&script).exists() {
+                bail!(
+                    "script '{}' not found in {}",
+                    script,
+                    scripts_dir().display()
+                );
+            }
+            if every == 0 {
+                bail!("--every must be greater than 0");
+            }
+            cron_service::register(db, &script, every)?;
+            if !ipc::ping() && !flags.quiet && !flags.json {
+                eprintln!("  note: orphd is offline — schedule will run when daemon starts");
+            }
+            if flags.json {
+                println!(
+                    "{{\"script\": \"{}\", \"every_secs\": {}, \"registered\": true}}",
+                    script, every
+                );
+            } else if !flags.quiet {
+                println!("cron: '{}' scheduled every {}s (orphd)", script, every);
+            }
+        }
+        CronAction::List => {
+            let jobs = cron_service::list(db)?;
+            if flags.json {
+                println!("{}", serde_json::to_string(&jobs)?);
+            } else if jobs.is_empty() {
+                if !flags.quiet {
+                    println!("no cron jobs — use `orph run cron add <script> --every <secs>`");
+                }
+            } else {
+                println!("cron jobs:");
+                for j in &jobs {
+                    println!(
+                        "  {:<16} every {}s  last={}",
+                        j.script_name,
+                        j.interval_secs,
+                        j.last_run.as_deref().unwrap_or("never")
+                    );
+                }
+            }
+        }
+        CronAction::Remove { script } => {
+            let removed = cron_service::remove(db, &script)?;
+            if flags.json {
+                println!("{{\"script\": \"{}\", \"removed\": {}}}", script, removed);
+            } else if removed {
+                println!("cron: removed '{}'", script);
+            } else {
+                bail!("no cron job for '{}'", script);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn list_scripts(flags: &OutputFlags) -> Result<()> {

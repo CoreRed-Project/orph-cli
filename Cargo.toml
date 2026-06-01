@@ -27,6 +27,10 @@ sysinfo = "0.38.4"
 anyhow = "1"
 clap_complete = "4"
 libc = "0.2"
+ratatui = "0.29"
+crossterm = "0.29"
+tar = "0.4"
+flate2 = "1"
 
 [dev-dependencies]
 assert_cmd = "2"

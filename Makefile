@@ -15,6 +15,7 @@ release:
 cross:
 	cargo build --release --target $(TARGET_ARM)
 
+# If permission denied, run with sudo
 install: release
 	install -m 755 $(RELEASE_DIR)/$(BIN_NAME)  /usr/local/bin/$(BIN_NAME)
 	install -m 755 $(RELEASE_DIR)/$(DAEMON)     /usr/local/bin/$(DAEMON)

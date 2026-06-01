@@ -1,5 +1,6 @@
 use crate::cli::OutputFlags;
 use crate::ipc;
+use crate::services::diagnostics;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, RefreshKind, System};
@@ -15,6 +16,7 @@ impl SysArgs {
         match self.cmd {
             SysCmd::Status => "status",
             SysCmd::Info => "info",
+            SysCmd::Net => "net",
         }
     }
 }
@@ -25,6 +27,8 @@ pub enum SysCmd {
     Status,
     /// Show detailed system information
     Info,
+    /// Show local network interface status (offline, no external commands)
+    Net,
 }
 
 pub fn handle(args: SysArgs, flags: &OutputFlags) -> Result<()> {
@@ -66,8 +70,73 @@ pub fn handle(args: SysArgs, flags: &OutputFlags) -> Result<()> {
             );
             info(&sys, flags);
         }
+        SysCmd::Net => {
+            // Try daemon first; fall back to local if not running.
+            if let Some(resp) = ipc::send(&ipc::Request {
+                command: "sys.net".into(),
+                payload: serde_json::Value::Null,
+            }) && resp.is_ok()
+                && let Some(data) = resp.data
+            {
+                if flags.json {
+                    println!("{}", data);
+                } else {
+                    print_net_from_json(&data, flags);
+                }
+                return Ok(());
+            }
+
+            if !flags.quiet && !flags.json {
+                eprintln!("  [daemon offline — running in local fallback mode]");
+            }
+            let snap = diagnostics::net_snapshot_local()?;
+            if flags.json {
+                println!("{}", serde_json::to_string(&snap)?);
+            } else {
+                print_net(&snap, flags);
+            }
+        }
     }
     Ok(())
+}
+
+fn print_net_from_json(data: &serde_json::Value, flags: &OutputFlags) {
+    if flags.quiet {
+        let count = data["interfaces"].as_array().map(|a| a.len()).unwrap_or(0);
+        println!("interfaces={}", count);
+        return;
+    }
+    let snap: crate::models::diagnostics::NetSnapshot = serde_json::from_value(data.clone())
+        .unwrap_or(crate::models::diagnostics::NetSnapshot { interfaces: vec![] });
+    print_net(&snap, flags);
+}
+
+fn print_net(snap: &crate::models::diagnostics::NetSnapshot, flags: &OutputFlags) {
+    if snap.interfaces.is_empty() {
+        if !flags.quiet {
+            println!("sys net");
+            println!("  (no interfaces found or unsupported OS)");
+        }
+        return;
+    }
+    println!("sys net");
+    for iface in &snap.interfaces {
+        let state = iface
+            .operstate
+            .as_deref()
+            .unwrap_or(if iface.is_up { "up" } else { "down" });
+        println!("  {}", iface.name);
+        println!("    state   : {}", state);
+        if !iface.ipv4.is_empty() {
+            println!("    ipv4    : {}", iface.ipv4.join(", "));
+        }
+        if !iface.ipv6.is_empty() {
+            println!("    ipv6    : {}", iface.ipv6.join(", "));
+        }
+        if let Some(gw) = &iface.gateway_v4 {
+            println!("    gateway : {}", gw);
+        }
+    }
 }
 
 /// Format daemon sys.status response in human mode.

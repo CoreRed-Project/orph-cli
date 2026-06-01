@@ -1,6 +1,6 @@
 use crate::cli::OutputFlags;
 use crate::ipc;
-use crate::services::{logger, pet_service};
+use crate::services::{logger, pet_events, pet_service};
 use clap::{Args, Subcommand};
 use rusqlite::Connection;
 
@@ -17,6 +17,7 @@ impl PetArgs {
             Some(PetCmd::Feed) => "feed",
             Some(PetCmd::Play) => "play",
             Some(PetCmd::Rename { .. }) => "rename",
+            Some(PetCmd::Event) => "event",
         }
     }
 }
@@ -34,6 +35,8 @@ pub enum PetCmd {
         /// New name
         name: String,
     },
+    /// Trigger or view random pet events
+    Event,
 }
 
 pub fn handle(args: PetArgs, conn: &Connection, flags: &OutputFlags) -> anyhow::Result<()> {
@@ -43,6 +46,7 @@ pub fn handle(args: PetArgs, conn: &Connection, flags: &OutputFlags) -> anyhow::
         PetCmd::Feed => Some("pet.feed"),
         PetCmd::Play => Some("pet.play"),
         PetCmd::Rename { .. } => None,
+        PetCmd::Event => None,
     };
 
     // Try daemon first for supported commands.
@@ -82,6 +86,7 @@ pub fn handle(args: PetArgs, conn: &Connection, flags: &OutputFlags) -> anyhow::
                 "pet '{}' fed (hunger={}, happiness={})",
                 pet.name, pet.hunger, pet.happiness
             ));
+            let _ = pet_events::maybe_random(conn);
             print_pet(&pet, flags, Some("feed"))?;
         }
         PetCmd::Play => {
@@ -90,6 +95,7 @@ pub fn handle(args: PetArgs, conn: &Connection, flags: &OutputFlags) -> anyhow::
                 "pet '{}' played (happiness={})",
                 pet.name, pet.happiness
             ));
+            let _ = pet_events::maybe_random(conn);
             print_pet(&pet, flags, Some("play"))?;
         }
         PetCmd::Rename { name } => {
@@ -99,6 +105,17 @@ pub fn handle(args: PetArgs, conn: &Connection, flags: &OutputFlags) -> anyhow::
                 println!("{}", serde_json::to_string(&pet)?);
             } else {
                 println!("⋆｡°✩ your pet is now called {} ✩°｡⋆", pet.name);
+            }
+        }
+        PetCmd::Event => {
+            let ev = pet_events::record_random(conn)?;
+            if flags.json {
+                println!("{}", serde_json::to_string(&ev)?);
+            } else if flags.quiet {
+                println!("{}", ev.message);
+            } else {
+                println!("pet event");
+                println!("  {}", ev.message);
             }
         }
     }

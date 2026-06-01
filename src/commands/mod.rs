@@ -1,8 +1,11 @@
 pub mod cfg;
 pub mod completions;
 pub mod core;
+pub mod health;
+pub mod island;
 pub mod logs;
 pub mod pet;
 pub mod run;
+pub mod storage;
 pub mod sys;
 pub mod telemetry;

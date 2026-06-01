@@ -46,6 +46,19 @@ fn create_tables(conn: &Connection) -> Result<()> {
             command TEXT NOT NULL,
             timestamp TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS cron_jobs (
+            script_name TEXT PRIMARY KEY,
+            interval_secs INTEGER NOT NULL,
+            last_run TEXT,
+            enabled INTEGER NOT NULL DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS pet_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
         ",
     )?;
 

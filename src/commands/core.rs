@@ -1,7 +1,10 @@
 use crate::cli::OutputFlags;
 use crate::ipc;
+use crate::services::backup;
 use anyhow::Result;
 use clap::{Args, Subcommand};
+use std::os::unix::process::CommandExt;
+use std::path::PathBuf;
 
 #[derive(Args)]
 pub struct CoreArgs {
@@ -15,6 +18,8 @@ impl CoreArgs {
             CoreCmd::Status => "status",
             CoreCmd::Start => "start",
             CoreCmd::Stop => "stop",
+            CoreCmd::Backup { .. } => "backup",
+            CoreCmd::Restore { .. } => "restore",
         }
     }
 }
@@ -27,6 +32,17 @@ pub enum CoreCmd {
     Start,
     /// Stop the orphd daemon
     Stop,
+    /// Bundle ~/.orph/ into a compressed snapshot
+    Backup {
+        /// Output path (default: ~/.orph/backups/orph-<timestamp>.orphbak)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+    /// Restore ~/.orph/ from a snapshot archive
+    Restore {
+        /// Path to .orphbak archive
+        archive: PathBuf,
+    },
 }
 
 pub fn handle(args: CoreArgs, flags: &OutputFlags) -> Result<()> {
@@ -41,7 +57,33 @@ pub fn handle(args: CoreArgs, flags: &OutputFlags) -> Result<()> {
         CoreCmd::Stop => {
             stop(flags);
         }
+        CoreCmd::Backup { output } => backup_cmd(output, flags),
+        CoreCmd::Restore { archive } => restore_cmd(archive, flags),
     }
+}
+
+fn backup_cmd(output: Option<PathBuf>, flags: &OutputFlags) -> Result<()> {
+    let result = backup::create_backup(output)?;
+    if flags.json {
+        println!("{}", serde_json::to_string(&result)?);
+    } else if !flags.quiet {
+        println!("backup created: {}", result.archive);
+        println!("  size: {} bytes", result.bytes);
+    }
+    Ok(())
+}
+
+fn restore_cmd(archive: PathBuf, flags: &OutputFlags) -> Result<()> {
+    backup::restore_backup(&archive)?;
+    if flags.json {
+        println!(
+            "{{\"restored\": true, \"archive\": \"{}\"}}",
+            archive.display()
+        );
+    } else if !flags.quiet {
+        println!("restored from {}", archive.display());
+    }
+    Ok(())
 }
 
 fn status(flags: &OutputFlags) {
@@ -53,7 +95,7 @@ fn status(flags: &OutputFlags) {
         println!(
             "{{\"daemon\": \"orphd\", \"status\": \"{}\", \"socket\": \"{}\", \"version\": \"{}\"}}",
             state,
-            ipc::SOCKET_PATH,
+            ipc::socket_path_display(),
             version
         );
     } else if flags.quiet {
@@ -62,7 +104,7 @@ fn status(flags: &OutputFlags) {
         println!("core status");
         println!("  daemon  : orphd");
         println!("  status  : {}", state);
-        println!("  socket  : {}", ipc::SOCKET_PATH);
+        println!("  socket  : {}", ipc::socket_path_display());
         println!("  version : {}", version);
     }
 }
@@ -112,8 +154,10 @@ fn start(flags: &OutputFlags) -> ! {
     }
 
     let child = std::process::Command::new(&orphd_path)
+        .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
+        .process_group(0)
         .spawn();
 
     match child {

@@ -1,5 +1,5 @@
 use orph_cli::ipc::Response;
-use orph_cli::services::{config_service, pet_service};
+use orph_cli::services::{config_service, diagnostics, pet_service};
 use rusqlite::Connection;
 use serde_json::json;
 use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, RefreshKind, System};
@@ -37,6 +37,13 @@ pub fn sys_status() -> Response {
         "disk_total_gb":disk_total / 1024 / 1024 / 1024,
         "disk_percent": disk_pct,
     }))
+}
+
+pub fn sys_net() -> Response {
+    match diagnostics::net_snapshot_local() {
+        Ok(snap) => Response::ok(serde_json::to_value(&snap).unwrap_or_default()),
+        Err(e) => Response::error(e.to_string()),
+    }
 }
 
 fn disk_stats(disks: &Disks) -> (u64, u64) {
@@ -114,7 +121,15 @@ pub fn cfg_set(conn: &Connection, payload: &serde_json::Value) -> Response {
 // ── LOGS ─────────────────────────────────────────────────────────────────────
 
 pub fn logs_read(payload: &serde_json::Value) -> Response {
-    let tail = payload["tail"].as_bool().unwrap_or(false);
+    let tail_n: Option<usize> = payload["tail"]
+        .as_u64()
+        .and_then(|n| usize::try_from(n).ok())
+        .or_else(|| {
+            payload["tail"]
+                .as_bool()
+                .and_then(|b| if b { Some(20) } else { None })
+        });
+
     let level_filter = payload["level"].as_str().map(|l| l.to_uppercase());
 
     let log_path = {
@@ -148,11 +163,11 @@ pub fn logs_read(payload: &serde_json::Value) -> Response {
         })
         .collect();
 
-    let output: Vec<&String> = if tail {
-        let start = lines.len().saturating_sub(20);
-        lines[start..].iter().collect()
+    let output: Vec<String> = if let Some(n) = tail_n {
+        let start = lines.len().saturating_sub(n);
+        lines[start..].to_vec()
     } else {
-        lines.iter().collect()
+        lines
     };
 
     Response::ok(serde_json::to_value(&output).unwrap_or_default())

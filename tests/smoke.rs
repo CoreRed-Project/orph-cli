@@ -1,16 +1,21 @@
 /// Smoke tests for orph CLI — exit-code and JSON validity checks.
 use assert_cmd::Command;
+use tempfile::TempDir;
 
 #[test]
 fn sys_status_exits_ok() {
+    let home = TempDir::new().unwrap();
     let mut cmd = Command::cargo_bin("orph").unwrap();
+    cmd.env("HOME", home.path());
     cmd.args(["sys", "status"]);
     cmd.assert().success();
 }
 
 #[test]
 fn pet_status_json_is_valid() {
+    let home = TempDir::new().unwrap();
     let mut cmd = Command::cargo_bin("orph").unwrap();
+    cmd.env("HOME", home.path());
     cmd.args(["pet", "status", "--json"]);
     let output = cmd.output().expect("failed to run orph");
     // Must exit 0

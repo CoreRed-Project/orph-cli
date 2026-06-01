@@ -3,9 +3,27 @@
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
+use std::path::PathBuf;
 use std::time::Duration;
 
-pub const SOCKET_PATH: &str = "/tmp/orphd.sock";
+const SOCKET_ENV: &str = "ORPH_SOCKET_PATH";
+const SOCKET_FILE: &str = "orphd.sock";
+
+pub fn socket_path() -> PathBuf {
+    if let Some(path) = std::env::var_os(SOCKET_ENV).map(PathBuf::from) {
+        return path;
+    }
+
+    let temp_dir = std::env::temp_dir();
+    temp_dir
+        .canonicalize()
+        .unwrap_or(temp_dir)
+        .join(SOCKET_FILE)
+}
+
+pub fn socket_path_display() -> String {
+    socket_path().display().to_string()
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Request {
@@ -47,7 +65,7 @@ impl Response {
 
 /// Attempt to send a request to orphd. Returns `None` if daemon is not running.
 pub fn send(req: &Request) -> Option<Response> {
-    let mut stream = UnixStream::connect(SOCKET_PATH).ok()?;
+    let mut stream = UnixStream::connect(socket_path()).ok()?;
     stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
     stream
         .set_write_timeout(Some(Duration::from_secs(5)))

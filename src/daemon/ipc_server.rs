@@ -1,14 +1,15 @@
-use orph_cli::ipc::{Request, Response, SOCKET_PATH};
+use orph_cli::ipc::{self, Request, Response};
 use rusqlite::Connection;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixListener;
 
 /// Blocking IPC server loop. Handles one connection at a time.
 pub fn serve(conn: &Connection) {
-    let listener = UnixListener::bind(SOCKET_PATH)
+    let socket_path = ipc::socket_path();
+    let listener = UnixListener::bind(&socket_path)
         .expect("failed to bind socket — is another orphd already running?");
 
-    eprintln!("orphd: listening on {}", SOCKET_PATH);
+    eprintln!("orphd: listening on {}", socket_path.display());
 
     for stream in listener.incoming() {
         match stream {
@@ -32,7 +33,7 @@ pub fn serve(conn: &Connection) {
                 drop(stream);
 
                 if shutdown {
-                    let _ = std::fs::remove_file(SOCKET_PATH);
+                    let _ = std::fs::remove_file(ipc::socket_path());
                     std::process::exit(0);
                 }
             }
@@ -46,6 +47,7 @@ fn dispatch(req: &Request, conn: &Connection) -> (Response, bool) {
     let resp = match req.command.as_str() {
         "ping" => Response::ok(serde_json::json!({"pong": true})),
         "sys.status" => super::handlers::sys_status(),
+        "sys.net" => super::handlers::sys_net(),
         "pet.status" => super::handlers::pet_status(conn),
         "pet.feed" => super::handlers::pet_feed(conn),
         "pet.play" => super::handlers::pet_play(conn),

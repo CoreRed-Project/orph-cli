@@ -27,8 +27,14 @@ pub struct Cli {
 pub enum Domain {
     /// Show CPU, memory, and disk status — start here
     Sys(crate::commands::sys::SysArgs),
+    /// Local hardware diagnostics (temperature, throttling, power)
+    Health(crate::commands::health::HealthArgs),
+    /// Disk analysis and safe temp cleanup
+    Storage(crate::commands::storage::StorageArgs),
     /// Manage the optional orphd background daemon
     Core(crate::commands::core::CoreArgs),
+    /// Launch the interactive TUI dashboard
+    Island(crate::commands::island::IslandArgs),
     /// Run scripts from ~/.orph/scripts/ (auto-created on first use)
     Run(crate::commands::run::RunArgs),
     /// View local command logs

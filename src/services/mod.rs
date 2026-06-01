@@ -1,5 +1,13 @@
+pub mod backup;
 pub mod config_service;
+pub mod cron_service;
 pub mod db;
+pub mod diagnostics;
+pub mod health;
 pub mod logger;
+pub mod paths;
+pub mod pet_events;
 pub mod pet_service;
+pub mod script_runner;
+pub mod storage;
 pub mod telemetry;
