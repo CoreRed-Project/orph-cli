@@ -437,15 +437,11 @@ fn handle_input_mode(
                 state.prompt.push(c);
             }
         }
-        KeyCode::Up => {
-            if state.input_mode == InputMode::ScriptLauncher {
-                state.script_selected = state.script_selected.saturating_sub(1);
-            }
+        KeyCode::Up if state.input_mode == InputMode::ScriptLauncher => {
+            state.script_selected = state.script_selected.saturating_sub(1);
         }
-        KeyCode::Down => {
-            if state.input_mode == InputMode::ScriptLauncher && !state.scripts.is_empty() {
-                state.script_selected = (state.script_selected + 1).min(state.scripts.len() - 1);
-            }
+        KeyCode::Down if state.input_mode == InputMode::ScriptLauncher && !state.scripts.is_empty() => {
+            state.script_selected = (state.script_selected + 1).min(state.scripts.len() - 1);
         }
         _ => {}
     }
