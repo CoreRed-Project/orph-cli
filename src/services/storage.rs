@@ -66,7 +66,7 @@ pub fn analyze_heavy_dirs(root: &Path, limit: usize) -> Result<AnalyzeResult> {
             size_bytes: item.size,
         });
     }
-    heaviest.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+    heaviest.sort_by_key(|b| std::cmp::Reverse(b.size_bytes));
     Ok(AnalyzeResult {
         root: root.display().to_string(),
         heaviest,

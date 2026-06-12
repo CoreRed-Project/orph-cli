@@ -158,7 +158,10 @@ fn parse_proc_net_route_default_gateway(content: &str) -> Option<String> {
 }
 
 #[cfg(target_os = "linux")]
-fn ifaddrs_iter() -> Result<Vec<(String, bool, Option<String>, bool)>> {
+type IfAddrInfo = (String, bool, Option<String>, bool);
+
+#[cfg(target_os = "linux")]
+fn ifaddrs_iter() -> Result<Vec<IfAddrInfo>> {
     // Returns (ifname, is_up, ip_string, is_ipv6)
     use std::ffi::CStr;
     use std::net::{Ipv4Addr, Ipv6Addr};

@@ -21,7 +21,7 @@ fn read_soc_temp_c() -> Option<f64> {
             .trim()
             .parse()
             .ok()?;
-        return Some(milli as f64 / 1000.0);
+        Some(milli as f64 / 1000.0)
     }
     #[cfg(not(target_os = "linux"))]
     {
