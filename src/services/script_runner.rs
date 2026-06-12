@@ -115,6 +115,13 @@ pub fn run_isolated(
         final_status.and_then(|s| s.code()).unwrap_or(-1)
     };
 
+    // Record this script run in the sqlite history
+    if let Ok(conn) = crate::services::db::init() {
+        let _ = crate::services::script_history_service::record_run(
+            &conn, name, exit_code, timed_out, elapsed_ms, &stdout, &stderr,
+        );
+    }
+
     Ok(ScriptRunResult {
         script: name.to_string(),
         exit_code,

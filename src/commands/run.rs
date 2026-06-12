@@ -410,6 +410,19 @@ fn run_script(parts: &[String], flags: &OutputFlags) -> Result<()> {
         final_status.and_then(|s| s.code()).unwrap_or(-1)
     };
 
+    // Record this script run in the sqlite history
+    if let Ok(conn) = crate::services::db::init() {
+        let _ = crate::services::script_history_service::record_run(
+            &conn,
+            script_name,
+            exit_code,
+            timed_out,
+            elapsed_ms,
+            &stdout,
+            &stderr,
+        );
+    }
+
     logger::info(&format!(
         "script '{}' finished: exit_code={} elapsed={}ms timed_out={}",
         script_name, exit_code, elapsed_ms, timed_out

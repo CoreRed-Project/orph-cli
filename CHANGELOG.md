@@ -6,7 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ---
 
-## [Unreleased]
+## [v0.9.0] — 2026-06-12
+
+### Added
+- **TUI Overlays (Island)**: Press `F3` for Detailed System Diagnostics (with Raspberry Pi thermal tracking, voltage warnings, and advice) and `F6` for Script History tracing.
+- **Background Script Executions**: Spawns script executions asynchronously inside the TUI without blocking the terminal drawing loops. Includes live running time indicators.
+- **SQLite Database Tracing**: Added `script_history` logging table to persist script execution details (stdout/stderr, durations, exit statuses) up to the last 50 runs.
+- **Database Telemetry limit**: Set custom caps on telemetry record retention using `orph cfg set telemetry_limit <N>` to manage DB sizes on disk.
+- **Diagnostics index**: Created database index `idx_telemetry_command` to optimize command traces.
+
+### Changed
+- **Companion Balance**: Reduced pet decay frequencies (hunger rate down to 5.0/h, happiness decay down to 3.0/h).
+- **RPi Clock Jump Protection**: Safeguarded against backwards time jumps in pet state calculations to avoid crashes or data corruptions.
+- **CI Workflows**: Changed CI workflows to execute `cargo test --workspace --all-targets` to make sure integration tests run during verification phases.
+
+### Fixed
+- Clippy warning regarding redundant pattern matching in `db.rs` resolved.
+- Codebase formatted to Rust standard syntax rules.
 
 ---
 
@@ -73,6 +89,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ---
 
-[Unreleased]: https://github.com/CoreRed-Project/orph-cli/compare/v0.1.1...HEAD
+[v0.9.0]: https://github.com/CoreRed-Project/orph-cli/compare/v0.1.1...v0.9.0
 [v0.1.1]: https://github.com/CoreRed-Project/orph-cli/compare/v0.1.0...v0.1.1
 [v0.1.0]: https://github.com/CoreRed-Project/orph-cli/releases/tag/v0.1.0

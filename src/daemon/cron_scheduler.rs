@@ -47,19 +47,32 @@ fn tick() -> anyhow::Result<()> {
 fn due_jobs(conn: &Connection) -> anyhow::Result<Vec<cron_service::CronJob>> {
     let jobs = cron_service::list(conn)?;
     let now = Utc::now();
-    Ok(jobs
-        .into_iter()
-        .filter(|job| job.enabled)
-        .filter(|job| match &job.last_run {
+    let mut out = Vec::new();
+    for job in jobs {
+        if !job.enabled {
+            continue;
+        }
+        let is_due = match &job.last_run {
             None => true,
             Some(ts) => {
-                let Ok(last) = ts.parse::<chrono::DateTime<Utc>>() else {
-                    return true;
-                };
-                (now - last).num_seconds() >= job.interval_secs as i64
+                if let Ok(last) = ts.parse::<chrono::DateTime<Utc>>() {
+                    if now < last {
+                        // Clock jumped backwards! Reset last_run to now to recover immediately.
+                        let _ = mark_run(conn, &job.script_name);
+                        true
+                    } else {
+                        (now - last).num_seconds() >= job.interval_secs as i64
+                    }
+                } else {
+                    true
+                }
             }
-        })
-        .collect())
+        };
+        if is_due {
+            out.push(job);
+        }
+    }
+    Ok(out)
 }
 
 fn mark_run(conn: &Connection, script_name: &str) -> anyhow::Result<()> {

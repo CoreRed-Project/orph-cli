@@ -10,10 +10,10 @@ fn decay_zero_elapsed_no_change() {
 
 #[test]
 fn decay_one_hour() {
-    // hunger: 20 + 10*1 = 30, happiness: 80 - 5*1 = 75
+    // hunger: 20 + 5*1 = 25, happiness: 80 - 3*1 = 77
     let (h, hap) = calculate_decay(20, 80, 1.0);
-    assert_eq!(h, 30);
-    assert_eq!(hap, 75);
+    assert_eq!(h, 25);
+    assert_eq!(hap, 77);
 }
 
 #[test]

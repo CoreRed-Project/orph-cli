@@ -1,6 +1,13 @@
 use chrono::Utc;
 use rusqlite::{Connection, Result};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static IS_READ_ONLY: AtomicBool = AtomicBool::new(false);
+
+pub fn is_read_only() -> bool {
+    IS_READ_ONLY.load(Ordering::Relaxed)
+}
 
 pub fn db_path() -> PathBuf {
     let base = dirs_home();
@@ -8,9 +15,13 @@ pub fn db_path() -> PathBuf {
 }
 
 fn dirs_home() -> PathBuf {
-    std::env::var("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("."))
+    if let Ok(home) = std::env::var("ORPH_HOME") {
+        return PathBuf::from(home);
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        return PathBuf::from(home);
+    }
+    std::env::temp_dir().join("orph")
 }
 
 pub fn init() -> Result<Connection> {
@@ -18,9 +29,25 @@ pub fn init() -> Result<Connection> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).ok();
     }
-    let conn = Connection::open(&path)?;
-    create_tables(&conn)?;
-    Ok(conn)
+
+    match Connection::open(&path) {
+        Ok(conn) => {
+            if create_tables(&conn).is_err() {
+                IS_READ_ONLY.store(true, Ordering::Relaxed);
+                let mem_conn = Connection::open_in_memory()?;
+                create_tables(&mem_conn)?;
+                Ok(mem_conn)
+            } else {
+                Ok(conn)
+            }
+        }
+        Err(_) => {
+            IS_READ_ONLY.store(true, Ordering::Relaxed);
+            let mem_conn = Connection::open_in_memory()?;
+            create_tables(&mem_conn)?;
+            Ok(mem_conn)
+        }
+    }
 }
 
 fn create_tables(conn: &Connection) -> Result<()> {
@@ -59,6 +86,17 @@ fn create_tables(conn: &Connection) -> Result<()> {
             message TEXT NOT NULL,
             created_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS script_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            script_name TEXT NOT NULL,
+            exit_code INTEGER NOT NULL,
+            timed_out INTEGER NOT NULL,
+            elapsed_ms INTEGER NOT NULL,
+            stdout TEXT NOT NULL,
+            stderr TEXT NOT NULL,
+            started_at TEXT NOT NULL
+        );
         ",
     )?;
 
@@ -82,5 +120,54 @@ fn create_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    // Create telemetry command index
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_telemetry_command ON telemetry(command)",
+        [],
+    );
+
+    // Create script history index
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_script_history_name ON script_history(script_name)",
+        [],
+    );
+
     Ok(())
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct StorageStats {
+    pub configs: i64,
+    pub telemetry: i64,
+    pub cron_jobs: i64,
+    pub scripts: i64,
+}
+
+pub fn get_storage_stats(conn: &Connection) -> Result<StorageStats> {
+    let configs: i64 = conn
+        .query_row("SELECT COUNT(*) FROM config", [], |r| r.get(0))
+        .unwrap_or(0);
+    let telemetry: i64 = conn
+        .query_row("SELECT COUNT(*) FROM telemetry", [], |r| r.get(0))
+        .unwrap_or(0);
+    let cron_jobs: i64 = conn
+        .query_row("SELECT COUNT(*) FROM cron_jobs", [], |r| r.get(0))
+        .unwrap_or(0);
+
+    let scripts_dir = crate::services::paths::scripts_dir();
+    let scripts = std::fs::read_dir(scripts_dir)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().is_file())
+                .count() as i64
+        })
+        .unwrap_or(0);
+
+    Ok(StorageStats {
+        configs,
+        telemetry,
+        cron_jobs,
+        scripts,
+    })
 }

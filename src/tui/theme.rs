@@ -4,21 +4,26 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::block::Padding;
 use ratatui::widgets::{Block, BorderType, Borders};
 
-// ── Sxnnyside Aesthetic: Dark palette with warm digital nostalgia ─────────
+// ── Fruity & Cute Pastel Aesthetic: Soft machine vibes by Sxnnyside ───────
 
-pub const ORANGE: Color = Color::Rgb(226, 146, 84); // Warm phosphor amber
-pub const CYAN: Color = Color::Rgb(118, 190, 204); // Aged terminal cyan
-pub const MINT: Color = Color::Rgb(145, 220, 190); // Soft signal mint
-pub const PET_ART: Color = Color::Rgb(194, 213, 190); // Companion bone/glow
-pub const TEXT: Color = Color::Rgb(196, 198, 196); // Primary text
-pub const TEXT_DIM: Color = Color::Rgb(103, 112, 118); // Subtle labels
-pub const BORDER: Color = Color::Rgb(70, 94, 98); // Quiet custom frames
-pub const BAR_EMPTY: Color = Color::Rgb(31, 39, 42); // Empty bar segments
-pub const WARN: Color = Color::Rgb(225, 178, 94); // Warning color
-pub const ERR: Color = Color::Rgb(216, 93, 96); // Error/critical color
-pub const GLOW_WARM: Color = Color::Rgb(236, 176, 115); // Brand glow
-pub const DIGITAL: Color = Color::Rgb(106, 205, 180); // Digital/tech accent
-pub const ACCENT_BORDER: Color = Color::Rgb(160, 212, 190); // Companion frame
+pub const STRAWBERRY: Color = Color::Rgb(255, 145, 150); // Soft pastel pink-red
+pub const PEACH: Color = Color::Rgb(255, 185, 150); // Warm pastel orange
+pub const BANANA: Color = Color::Rgb(250, 230, 160); // Soft pastel yellow
+pub const MINT: Color = Color::Rgb(160, 235, 195); // Soft leafy mint
+pub const BLUEBERRY: Color = Color::Rgb(155, 210, 255); // Soft sky/blueberry
+pub const LAVENDER: Color = Color::Rgb(215, 185, 255); // Soft pastel lavender
+
+pub const ORANGE: Color = PEACH;
+pub const CYAN: Color = BLUEBERRY;
+pub const PET_ART: Color = Color::Rgb(245, 230, 235); // Soft cream/blush
+pub const TEXT: Color = Color::Rgb(235, 235, 235); // Readable white
+pub const TEXT_DIM: Color = Color::Rgb(145, 165, 175); // Soft pastel slate
+pub const BORDER: Color = Color::Rgb(90, 115, 125); // Gentle frames
+pub const BAR_EMPTY: Color = Color::Rgb(40, 50, 55); // Soft dark gap
+pub const WARN: Color = BANANA;
+pub const ERR: Color = STRAWBERRY;
+pub const GLOW_WARM: Color = STRAWBERRY;
+pub const ACCENT_BORDER: Color = LAVENDER;
 
 pub fn label() -> Style {
     Style::default().fg(TEXT_DIM)
@@ -29,11 +34,11 @@ pub fn value() -> Style {
 }
 
 pub fn prompt() -> Style {
-    Style::default().fg(MINT).add_modifier(Modifier::DIM)
+    Style::default().fg(MINT).add_modifier(Modifier::BOLD)
 }
 
 pub fn key() -> Style {
-    Style::default().fg(ORANGE).add_modifier(Modifier::BOLD)
+    Style::default().fg(PEACH).add_modifier(Modifier::BOLD)
 }
 
 pub fn action() -> Style {
@@ -41,7 +46,7 @@ pub fn action() -> Style {
 }
 
 pub fn title_style() -> Style {
-    Style::default().fg(CYAN).add_modifier(Modifier::BOLD)
+    Style::default().fg(BLUEBERRY).add_modifier(Modifier::BOLD)
 }
 
 fn title_line(title: &str) -> Line<'static> {
@@ -49,25 +54,49 @@ fn title_line(title: &str) -> Line<'static> {
 }
 
 /// Quiet secondary frame; panels should feel like instruments, not dashboards.
-pub fn panel_block(title: impl Into<String>) -> Block<'static> {
+pub fn panel_block(title: impl Into<String>, focused: bool) -> Block<'static> {
     let t = title.into();
+    let border_style = if focused {
+        Style::default().fg(MINT).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(BORDER)
+    };
+    let border_type = if focused {
+        BorderType::Thick
+    } else {
+        BorderType::Rounded
+    };
+    let display_title = if focused { format!("▶ {}", t) } else { t };
+
     Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(BORDER))
-        .title_top(title_line(&t))
+        .border_type(border_type)
+        .border_style(border_style)
+        .title_top(title_line(&display_title))
         .title_alignment(Alignment::Left)
         .padding(Padding::new(1, 1, 0, 0))
 }
 
-pub fn alert_panel(title: impl Into<String>, critical: bool) -> Block<'static> {
+pub fn alert_panel(title: impl Into<String>, critical: bool, focused: bool) -> Block<'static> {
     let accent = if critical { ERR } else { WARN };
+    let border_style = if focused {
+        Style::default().fg(accent).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(accent)
+    };
+    let border_type = if focused {
+        BorderType::Thick
+    } else {
+        BorderType::Double
+    };
     let t = title.into();
+    let display_title = if focused { format!("▶ {}", t) } else { t };
+
     Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Double)
-        .border_style(Style::default().fg(accent))
-        .title_top(title_line(&t))
+        .border_type(border_type)
+        .border_style(border_style)
+        .title_top(title_line(&display_title))
         .title_alignment(Alignment::Left)
         .padding(Padding::new(1, 1, 0, 0))
 }
@@ -140,25 +169,49 @@ pub fn pet_vitals_line(hunger: u8, happiness: u8) -> Line<'static> {
 }
 
 /// Companion panel with custom border (digital aesthetic)
-pub fn companion_panel_block(title: impl Into<String>) -> Block<'static> {
+pub fn companion_panel_block(title: impl Into<String>, focused: bool) -> Block<'static> {
     let t = title.into();
+    let border_style = if focused {
+        Style::default().fg(MINT).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(ACCENT_BORDER)
+    };
+    let border_type = if focused {
+        BorderType::Thick
+    } else {
+        BorderType::Double
+    };
+    let display_title = if focused { format!("▶ {}", t) } else { t };
+
     Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Double)
-        .border_style(Style::default().fg(ACCENT_BORDER))
-        .title_top(title_line(&t))
+        .border_type(border_type)
+        .border_style(border_style)
+        .title_top(title_line(&display_title))
         .title_alignment(Alignment::Left)
         .padding(Padding::new(1, 1, 0, 0))
 }
 
 /// System panel with tech aesthetic
-pub fn system_panel_block(title: impl Into<String>) -> Block<'static> {
+pub fn system_panel_block(title: impl Into<String>, focused: bool) -> Block<'static> {
     let t = title.into();
+    let border_style = if focused {
+        Style::default().fg(MINT).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(BORDER)
+    };
+    let border_type = if focused {
+        BorderType::Thick
+    } else {
+        BorderType::Plain
+    };
+    let display_title = if focused { format!("▶ {}", t) } else { t };
+
     Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Plain)
-        .border_style(Style::default().fg(BORDER))
-        .title_top(title_line(&t))
+        .border_type(border_type)
+        .border_style(border_style)
+        .title_top(title_line(&display_title))
         .title_alignment(Alignment::Left)
         .padding(Padding::new(1, 1, 0, 0))
 }

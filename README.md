@@ -46,8 +46,8 @@ This is a **Core Red** project, part of the Sxnnyside Project's experimental bra
 - **Optional daemon (`orphd`)**: Unix socket server for persistent state across rapid invocations. CLI works fully without it, falls back gracefully.
 - **System inspection**: Quick CPU, memory, disk, and host info via `orph sys` — useful when you don't have a dashboard or htop handy.
 - **Shell completions**: Bash, Zsh, Fish via `orph completions`.
-- **Local telemetry**: Command usage tracking stored in `~/.orph/orph.db`. Never transmitted. Opt-out in one command.
-- **Virtual pet** ฅ^•ﻌ•^ฅ: A time-decaying companion that lives in your terminal — `orph pet`. It fits the vibe, stays out of your way.
+- **Local telemetry**: Command usage tracking stored in `~/.orph/orph.db`. Never transmitted. Limit record database size via `telemetry_limit` configuration.
+- **Virtual pet** ฅ^•ﻌ•^ฅ: An animated, breathing time-decaying companion that lives in your terminal — `orph pet`. It fits the vibe, stays out of your way.
 
 ## Installation
 
@@ -135,17 +135,29 @@ Global flags: `--json` ✦ `--quiet` ✦ `--verbose`
 
 When offline, commands that support the daemon will note `[daemon offline — running in local fallback mode]`. Nothing breaks silently.
 
-### Telemetry
+### Telemetry & Limits
 
 Command usage is logged locally to `~/.orph/orph.db`. Nothing leaves the device.
 
+To limit the SQLite size footprint, you can configure the maximum number of telemetry records retained (FIFO truncation logic):
 ```bash
+# Cap at 500 records
+orph cfg set telemetry_limit 500
+
+# Disable telemetry completely
 orph cfg set telemetry disabled
 
 # verify:
 orph telemetry
 # telemetry is disabled
 ```
+
+### TUI Diagnostics & History Overlays
+
+When using the Orph Island TUI (`orph island run` / `cargo run -- island run`), you can use the following interactive overlay hotkeys:
+- **`F3`**: Opens the **Detailed System Diagnostics Overlay**, displaying CPU temperature (with warning limits), system load, undervoltage issues (warning on weak power adapters), filesystem overlay modes, and active troubleshooting logs.
+- **`F6`**: Opens the **Script Run History Overlay**, letting you inspect stdout, stderr, execution duration, and exit codes for recent background script runs.
+- **`Esc` / `q`**: Dismisses any active overlay popup and returns you to standard operations panels.
 
 ## Contributing
 

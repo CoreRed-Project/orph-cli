@@ -8,6 +8,7 @@ pub mod logger;
 pub mod paths;
 pub mod pet_events;
 pub mod pet_service;
+pub mod script_history_service;
 pub mod script_runner;
 pub mod storage;
 pub mod telemetry;

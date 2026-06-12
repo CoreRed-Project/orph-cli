@@ -4,13 +4,17 @@ use chrono::{DateTime, Utc};
 use rusqlite::{Connection, Result};
 
 /// Decay rates per hour
-const HUNGER_RATE: f64 = 10.0; // hunger increases 10 points/hour
-const HAPPINESS_RATE: f64 = 5.0; // happiness decreases 5 points/hour
+const HUNGER_RATE: f64 = 5.0; // hunger increases 5 points/hour
+const HAPPINESS_RATE: f64 = 3.0; // happiness decreases 3 points/hour
 
 /// Pure decay calculation — testable without DB.
 pub fn calculate_decay(hunger: u8, happiness: u8, elapsed_hours: f64) -> (u8, u8) {
-    let new_hunger = (hunger as f64 + HUNGER_RATE * elapsed_hours).clamp(0.0, 100.0) as u8;
-    let new_happiness = (happiness as f64 - HAPPINESS_RATE * elapsed_hours).clamp(0.0, 100.0) as u8;
+    let new_hunger = (hunger as f64 + HUNGER_RATE * elapsed_hours)
+        .clamp(0.0, 100.0)
+        .round() as u8;
+    let new_happiness = (happiness as f64 - HAPPINESS_RATE * elapsed_hours)
+        .clamp(0.0, 100.0)
+        .round() as u8;
     (new_hunger, new_happiness)
 }
 
@@ -39,26 +43,44 @@ fn apply_decay(conn: &Connection) -> Result<Pet> {
 
     let last: DateTime<Utc> = pet.last_updated.parse::<DateTime<Utc>>().unwrap_or(now);
 
-    let elapsed_hours = (now - last).num_seconds() as f64 / 3600.0;
-
-    if elapsed_hours <= 0.0 {
+    let mut elapsed_seconds = (now - last).num_seconds();
+    if elapsed_seconds < -10 {
+        // Backwards clock jump! Recover immediately.
+        let now_str = now.to_rfc3339();
+        conn.execute(
+            "UPDATE pet SET last_updated = ?1 WHERE id = 1",
+            rusqlite::params![now_str],
+        )?;
+        return fetch(conn);
+    }
+    if elapsed_seconds <= 0 {
         return Ok(pet);
     }
+    if elapsed_seconds > 86400 {
+        elapsed_seconds = 86400; // Cap at 24 hours
+    }
 
+    let elapsed_hours = elapsed_seconds as f64 / 3600.0;
     let (new_hunger, new_happiness) = calculate_decay(pet.hunger, pet.happiness, elapsed_hours);
+
+    let stats_changed = new_hunger != pet.hunger || new_happiness != pet.happiness;
     let now_str = now.to_rfc3339();
 
-    conn.execute(
-        "UPDATE pet SET hunger = ?1, happiness = ?2, last_updated = ?3 WHERE id = 1",
-        rusqlite::params![new_hunger as i64, new_happiness as i64, now_str],
-    )?;
+    if stats_changed {
+        conn.execute(
+            "UPDATE pet SET hunger = ?1, happiness = ?2, last_updated = ?3 WHERE id = 1",
+            rusqlite::params![new_hunger as i64, new_happiness as i64, now_str],
+        )?;
 
-    logger::info(&format!(
-        "pet decay applied: elapsed={:.2}h hunger {}→{} happiness {}→{}",
-        elapsed_hours, pet.hunger, new_hunger, pet.happiness, new_happiness
-    ));
+        logger::info(&format!(
+            "pet decay applied: elapsed={:.2}h hunger {}→{} happiness {}→{}",
+            elapsed_hours, pet.hunger, new_hunger, pet.happiness, new_happiness
+        ));
 
-    fetch(conn)
+        fetch(conn)
+    } else {
+        Ok(pet)
+    }
 }
 
 /// Public read: applies decay first, then returns state.
